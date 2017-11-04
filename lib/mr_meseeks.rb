@@ -7,6 +7,7 @@ require 'json'
 require 'fileutils'
 require 'pry'
 require_relative 'config.rb'
+require_relative 'event_data.rb'
 
 ########################
 #  AWFUL MONKEY PATCH  #
@@ -36,7 +37,8 @@ class MrMeseeks
 		    array = mail.message.subject.sub(',', '').split(':')
 		    band = array[1]
 		    date = Date.parse(array[2].split[0...4].join(' '))
-		    make_event(date, band, mail)
+		    message = mail.message.body.to_s
+		    make_event(date, band, message)
 		  end
 		end
 		gmail.logout
@@ -69,79 +71,22 @@ class MrMeseeks
   	credentials
 	end 
 
-	def make_event(date, band, mail)
-	  data = extract_data(date, mail)
-	  calendar_id = Config::CALENDAR_ID
+	def make_event(date, band, message)
+	  data = EventData.new(date, message)
 	  resource = Google::Apis::CalendarV3::Event.new({
 	      summary: "#{band} GIG",
-	      location: data[:location],
+	      location: data.location,
 	      start: {
-	        date_time: data[:load_in],
+	        date_time: data.load_in,
 	        time_zone: 'Europe/London',
 	      },
 	      end: {
-	        date_time: data[:curfew],
+	        date_time: data.curfew,
 	        time_zone: 'Europe/London',
 	      }
 	  })
 	  binding.pry
-	  result = $calendar.insert_event(calendar_id, resource)
+	  result = $calendar.insert_event(Config::CALENDAR_ID, resource)
 	  puts "Event created: #{result.html_link}"
-	end
-
-	# This belongs in its own class really
-
-	def extract_data(date, mail)
-		msg_body = mail.message.body.to_s
-		data = {
-			load_in: fetch_load_in(msg_body, date),
-			curfew: fetch_curfew(msg_body, date),
-			location: fetch_location(msg_body)
-		}
-	end
-
-	def fetch_load_in(message, date)
-		match = message.match(/Arrival Time:\r\n(\d{2}:\d{2})/)
-		if match
-			result = create_datetime(date, match[1])
-		else
-			result = create_datetime(date, "17:00")
-		end
-	end
-
-	def fetch_curfew(message, date)
-		match = message.match(/Curfew:\r\n(\d{2}:\d{2})/)
-		# HUGE UNSAFE ASSUMPTION HERE, WILL BREAK ON THE DEFAULTS
-		# SORT THIS NEXT
-		load_in = message.match(/Arrival Time:\r\n(\d{2}:\d{2})/)
-
-		if match
-			if match[1] < load_in[1]
-				result = create_datetime((date + 1), match[1])
-			else
-				result = create_datetime(date, match[1])				
-			end
-		else
-			result = create_datetime(date, "23:59")
-		end
-	end
-
-	def fetch_location(message)
-		match = message.match(/Venue:\r\n(.+)/)
-		if match
-			result = match[1].sub("\r", "")
-		else
-			result = "TBC"
-		end
-	end
-
-	def create_datetime(date, modifier)
-		# This is ugly Ken
-		(date.to_time + seconds_since_midnight(modifier)).to_datetime.to_s
-	end
-
-	def seconds_since_midnight(time_string)
-		time = Time.parse(time_string)
-		(time.hour * 60 * 60) + (time.min * 60) + (time.sec)
 	end
 end
