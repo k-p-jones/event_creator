@@ -8,19 +8,7 @@ require 'fileutils'
 require 'pry'
 require_relative 'config.rb'
 require_relative 'event_data.rb'
-
-########################
-#  AWFUL MONKEY PATCH  #
-########################
-class Object
-  def to_imap_date
-    date = respond_to?(:utc) ? utc.to_s : to_s
-    Date.parse(date).strftime("%d-%b-%Y")
-  end
-end
-######################
-#  END MONKEY PATCH  #
-######################
+require_relative 'patches/object.rb'
 
 class MrMeseeks
 	def initialize
@@ -32,7 +20,7 @@ class MrMeseeks
 
 	def scan_emails
 		gmail = Gmail.connect!(Config::UNAME, Config::PWORD)
-		gmail.inbox.emails(:after => (DateTime.now - 20).to_imap_date) do |mail|
+		gmail.inbox.emails(:after => DateTime.now - 20) do |mail|
 		  if mail.message.subject.start_with?("Hold The Date:")
 		    array = mail.message.subject.sub(',', '').split(':')
 		    band = array[1]
@@ -85,7 +73,6 @@ class MrMeseeks
 	        time_zone: 'Europe/London',
 	      }
 	  })
-	  binding.pry
 	  result = $calendar.insert_event(Config::CALENDAR_ID, resource)
 	  puts "Event created: #{result.html_link}"
 	end
