@@ -1,11 +1,12 @@
 class EventData
-	attr_reader :load_in, :curfew, :location
+	attr_reader :load_in, :curfew, :location, :date, :uid
 	def initialize(date, message)
 		@date = date
 		@message = message
 		@load_in = fetch_load_in
 		@curfew = fetch_curfew
 		@location = fetch_location
+		@uid = fetch_uid
 	end
 		
 	private
@@ -39,6 +40,10 @@ class EventData
 		else
 			result = "TBC"
 		end
+	end
+
+	def fetch_uid
+		@date.to_time.to_i + Date.parse(@load_in).to_time.to_i + Date.parse(@curfew).to_time.to_i
 	end
 
 	def create_datetime(date, modifier)

@@ -13,9 +13,9 @@ require_relative 'patches/object.rb'
 class MrMeseeks
 	def initialize
 		# Initialize the API
-		$calendar = Google::Apis::CalendarV3::CalendarService.new
-		$calendar.client_options.application_name = Config::APPLICATION_NAME
-		$calendar.authorization = authorize_calendar
+		@calendar = Google::Apis::CalendarV3::CalendarService.new
+		@calendar.client_options.application_name = Config::APPLICATION_NAME
+		@calendar.authorization = authorize_calendar
 	end
 
 	def scan_emails
@@ -59,21 +59,47 @@ class MrMeseeks
   	credentials
 	end 
 
+	def event_exists?(data, band)
+		exists = false
+		events = fetch_events_by_day(data.date)
+		events.each do |event|
+			uid = event.summary.match(/UID:(\d+)/)
+			next unless uid
+			exists =  true if event.summary.include?(band) && uid[1].to_i == data.uid
+		end
+		if exists
+			STDERR.puts("Not creating event #{data.uid} as it already exists")
+		end
+		exists
+	end
+
+	def fetch_events_by_day(date)
+		@calendar.list_events(Config::CALENDAR_ID,
+		  max_results: 10,
+		  single_events: true,
+		  order_by: 'startTime',
+		  time_min: date.to_time.iso8601,
+		  time_max: (date + 1).to_time.iso8601
+		 ).items
+	end
+
 	def make_event(date, band, message)
 	  data = EventData.new(date, message)
-	  resource = Google::Apis::CalendarV3::Event.new({
-	      summary: "#{band} GIG",
-	      location: data.location,
-	      start: {
-	        date_time: data.load_in,
-	        time_zone: 'Europe/London',
-	      },
-	      end: {
-	        date_time: data.curfew,
-	        time_zone: 'Europe/London',
-	      }
-	  })
-	  result = $calendar.insert_event(Config::CALENDAR_ID, resource)
-	  puts "Event created: #{result.html_link}"
+	  unless event_exists?(data, band)
+		  resource = Google::Apis::CalendarV3::Event.new({
+		      summary: "Band:#{band} UID:#{data.uid}",
+		      location: data.location,
+		      start: {
+		        date_time: data.load_in,
+		        time_zone: 'Europe/London',
+		      },
+		      end: {
+		        date_time: data.curfew,
+		        time_zone: 'Europe/London',
+		      }
+		  })
+		  result = @calendar.insert_event(Config::CALENDAR_ID, resource)
+		  puts "Event created: #{result.html_link}"
+		end
 	end
 end
