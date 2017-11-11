@@ -1,18 +1,25 @@
 class EventData
-	attr_reader :load_in, :curfew, :location, :date, :uid
-	def initialize(date, message)
+	attr_reader :load_in, :curfew, :location, 
+						  :date, :uid, :band, :summary
+	def initialize(date, mail, band)
 		@date = date
-		@message = message
+		@band = band
+		@subject = mail.message.subject.to_s
+		@message = mail.message.body.to_s
 		@load_in = fetch_load_in
 		@curfew = fetch_curfew
 		@location = fetch_location
 		@uid = fetch_uid
+		@summary = fetch_summary
 	end
 		
 	private
 
 	def fetch_load_in 
-		match = @message.match(/Arrival Time:\r\n(\d{2}:\d{2})/)
+		match = nil
+		duo_regex = Regexp.new(/Arrival Time:\r\n.+(\d{2}:\d{2})/)
+		gig_regex = Regexp.new(/Arrival Time:\r\n(\d{2}:\d{2})/)
+		match = @message.match(duo_regex) || @message.match(gig_regex)
 		if match
 			result = create_datetime(@date, match[1])
 		else
@@ -42,6 +49,8 @@ class EventData
 		end
 	end
 
+	# this is totally buggy if the load in and curfew times differ between the hold the date
+	# email and the confirmation. Deffo needs changing.
 	def fetch_uid
 		@date.to_time.to_i + Date.parse(@load_in).to_time.to_i + Date.parse(@curfew).to_time.to_i
 	end
@@ -53,5 +62,16 @@ class EventData
 	def seconds_since_midnight(time_string)
 		time = Time.parse(time_string)
 		(time.hour * 60 * 60) + (time.min * 60) + (time.sec)
+	end
+
+	def fetch_summary
+		str = "Band: #{@band}"
+		if @subject.downcase.include?('dj')
+			str += " + DJ"
+		end
+		if @subject.downcase.include?('acoustic')
+			str += " + ACOUSTIC"
+		end
+		str += " UID:#{@uid}"
 	end
 end

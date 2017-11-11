@@ -21,18 +21,21 @@ class MrMeseeks
 	def scan_emails
 		gmail = Gmail.connect!(Config::UNAME, Config::PWORD)
 		gmail.inbox.emails(:after => DateTime.now - 20) do |mail|
-		  if mail.message.subject.start_with?("Hold The Date:")
-		    array = mail.message.subject.sub(',', '').split(':')
-		    band = array[1]
-		    date = Date.parse(array[2].split[0...4].join(' '))
-		    message = mail.message.body.to_s
-		    make_event(date, band, message)
-		  end
+		  subject = mail.message.subject
+			next unless subject.downcase.start_with?("hold the date:") || subject.downcase.start_with?("gig confirmation")
+			process_gig(mail)
 		end
 		gmail.logout
 	end
 
 	private
+
+	def process_gig(mail)
+		array = mail.message.subject.sub(',', '').split(':')
+    band = array[1]
+    date = Date.parse(array[2].split[0...4].join(' '))
+    make_event(date, band, mail)
+	end
 
 	def authorize_calendar
 		oob_uri = 'urn:ietf:wg:oauth:2.0:oob'
@@ -65,6 +68,8 @@ class MrMeseeks
 		events.each do |event|
 			uid = event.summary.match(/UID:(\d+)/)
 			next unless uid
+			# BUG, uid makes use of curfew and load in times when in fact these can change between 
+			# hold the date and confirmation emails.
 			exists =  true if event.summary.include?(band) && uid[1].to_i == data.uid
 		end
 		if exists
@@ -83,11 +88,11 @@ class MrMeseeks
 		 ).items
 	end
 
-	def make_event(date, band, message)
-	  data = EventData.new(date, message)
+	def make_event(date, band, mail)
+	  data = EventData.new(date, mail, band)
 	  unless event_exists?(data, band)
 		  resource = Google::Apis::CalendarV3::Event.new({
-		      summary: "Band:#{band} UID:#{data.uid}",
+		      summary: data.summary,
 		      location: data.location,
 		      start: {
 		        date_time: data.load_in,
@@ -99,7 +104,8 @@ class MrMeseeks
 		      }
 		  })
 		  result = @calendar.insert_event(Config::CALENDAR_ID, resource)
-		  puts "Event created: #{result.html_link}"
+		  puts "Event created for #{band} on #{date.to_s} #{result.html_link}"
+		  puts data.summary
 		end
 	end
 end
