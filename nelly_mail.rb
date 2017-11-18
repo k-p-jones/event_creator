@@ -1,6 +1,3 @@
-require_relative 'lib/mr_meseeks.rb'
+require_relative 'lib/task_runner.rb'
 
-
-# could potentially create duplicates if someone responds to the email 
-# so we need to handle that.
-MrMeseeks.new.scan_emails
+TaskRunner.new.run
