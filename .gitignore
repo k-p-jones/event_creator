@@ -1,2 +1,3 @@
 /config/secrets.yml
 /client_secret.json
+/logs/*

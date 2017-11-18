@@ -3,6 +3,7 @@ require 'date'
 require 'json'
 require 'fileutils'
 require 'pry'
+require 'logger'
 require_relative 'config.rb'
 require_relative 'event_data.rb'
 require_relative 'calendar_service.rb'
@@ -10,14 +11,18 @@ require_relative 'patches/object.rb'
 
 class MrMeseeks
 	def initialize
+		log_file = File.new('./logs/nelly.log', 'a')
+		@logger = Logger.new(log_file)
+		$stderr = log_file
 		@calendar = CalendarService.new.calendar
 	end
 
 	def scan_emails
+		@logger.info "Preparing to scan emails"
 		gmail = Gmail.connect!(Config::UNAME, Config::PWORD)
 		gmail.inbox.emails(:after => DateTime.now - 20) do |mail|
 		  subject = mail.message.subject
-			next unless subject.downcase.start_with?("hold the date:") || subject.downcase.start_with?("gig confirmation")
+			next unless subject.downcase.start_with?("hold the date:")
 			process_gig(mail)
 		end
 		gmail.logout
@@ -38,12 +43,10 @@ class MrMeseeks
 		events.each do |event|
 			uid = event.summary.match(/UID:(\d+)/)
 			next unless uid
-			# BUG, uid makes use of curfew and load in times when in fact these can change between 
-			# hold the date and confirmation emails.
 			exists =  true if event.summary.include?(band) && uid[1].to_i == data.uid
 		end
 		if exists
-			STDERR.puts("Not creating event #{data.uid} as it already exists")
+			@logger.info("Not creating event #{data.uid} as it already exists")
 		end
 		exists
 	end
@@ -74,7 +77,7 @@ class MrMeseeks
 		      }
 		  })
 		  result = @calendar.insert_event(Config::CALENDAR_ID, resource)
-		  puts "Event created for #{band} on #{date.to_s} #{result.html_link}"
+		  @logger.info("Event created for #{band} on #{date.to_s} #{result.html_link}")
 		  puts data.summary
 		end
 	end

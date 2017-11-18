@@ -49,10 +49,11 @@ class EventData
 		end
 	end
 
-	# this is totally buggy if the load in and curfew times differ between the hold the date
-	# email and the confirmation. Deffo needs changing.
+	# For now while we are just dealing with hold the date emails I think it is 
+	# best to just use the date timestamp as UID as we are using the 
+	# band name as well to check if an event is a duplicate
 	def fetch_uid
-		@date.to_time.to_i + Date.parse(@load_in).to_time.to_i + Date.parse(@curfew).to_time.to_i
+		@date.to_time.to_i
 	end
 
 	def create_datetime(date, modifier)
