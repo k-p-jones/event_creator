@@ -10,7 +10,8 @@ require_relative 'calendar_service.rb'
 require_relative 'patches/object.rb'
 
 class TaskRunner
-  def initialize
+  def initialize(time_interval)
+    @time_interval = time_interval
     log_file = File.new('./logs/nelly.log', 'a')
     @logger = Logger.new(log_file)
     $stderr = log_file
@@ -20,12 +21,13 @@ class TaskRunner
 
   def run
     @logger.info "Preparing to scan emails"
-    @gmail.inbox.emails(:after => DateTime.now - 20) do |mail|
+    @gmail.inbox.emails(:after => DateTime.now - @time_interval) do |mail|
       subject = mail.message.subject
       next unless subject.downcase.start_with?("hold the date:")
       process_gig(mail)
     end
     @gmail.logout
+    @logger.info("Finished scan")
   end
 
   private
