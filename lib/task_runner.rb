@@ -66,21 +66,27 @@ class TaskRunner
   def make_event(date, band, mail)
     data = EventData.new(date, mail, band)
     unless event_exists?(data, band)
-      resource = Google::Apis::CalendarV3::Event.new({
-          summary: data.summary,
-          location: data.location,
-          start: {
-            date_time: data.load_in,
-            time_zone: 'Europe/London',
-          },
-          end: {
-            date_time: data.curfew,
-            time_zone: 'Europe/London',
-          }
-      })
-      result = @calendar.insert_event(Config::CALENDAR_ID, resource)
-      @logger.info("Event created for #{band} on #{date.to_s} #{result.html_link}")
-      puts data.summary
+      begin
+        resource = Google::Apis::CalendarV3::Event.new({
+            summary: data.summary,
+            location: data.location.force_encoding('UTF-8'),
+            start: {
+              date_time: data.load_in,
+              time_zone: 'Europe/London',
+            },
+            end: {
+              date_time: data.curfew,
+              time_zone: 'Europe/London',
+            }
+        })
+        result = @calendar.insert_event(Config::CALENDAR_ID, resource)
+        @logger.info("Event created for #{band} on #{date.to_s} #{result.html_link}")
+        puts data.summary
+      rescue Exception 
+        @logger.info("Failed to create gig at date!")
+        @logger.info("ERROR: #{$!.to_s}")
+        @logger.info($!.backtrace)
+      end
     end
   end
 end
