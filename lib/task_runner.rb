@@ -3,7 +3,6 @@ require 'date'
 require 'json'
 require 'fileutils'
 require 'pry'
-require 'logger'
 require_relative 'config.rb'
 require_relative 'event_data.rb'
 require_relative 'calendar_service.rb'
@@ -12,25 +11,26 @@ require_relative 'patches/object.rb'
 class TaskRunner
   def initialize(time_interval)
     @time_interval = time_interval
-    log_file = File.new('./logs/nelly.log', 'a')
-    @logger = Logger.new(log_file)
-    $stderr = log_file
     @calendar = CalendarService.new.calendar
     @gmail = Gmail.connect!(Config::UNAME, Config::PWORD)
   end
 
   def run
-    @logger.info "Preparing to scan emails"
+    STDERR.puts("[#{timestamp}] Preparing to scan emails")
     @gmail.inbox.emails(:after => DateTime.now - @time_interval) do |mail|
       subject = mail.message.subject
       next unless subject.downcase.start_with?("hold the date:")
       process_gig(mail)
     end
     @gmail.logout
-    @logger.info("Finished scan")
+    STDERR.puts("[#{timestamp}] Finished scan")
   end
 
   private
+
+  def timestamp
+    DateTime.now.to_s
+  end
 
   def process_gig(mail)
     array = mail.message.subject.sub(',', '').split(':')
@@ -48,7 +48,7 @@ class TaskRunner
       exists =  true if event.summary.include?(band) && uid[1].to_i == data.uid
     end
     if exists
-      @logger.info("Not creating event #{data.uid} as it already exists")
+      STDERR.puts("[#{timestamp}] Not creating event #{data.uid} as it already exists")
     end
     exists
   end
@@ -80,12 +80,12 @@ class TaskRunner
             }
         })
         result = @calendar.insert_event(Config::CALENDAR_ID, resource)
-        @logger.info("Event created for #{band} on #{date.to_s} #{result.html_link}")
-        puts data.summary
+        STDERR.puts("[#{timestamp}] Event created for #{band} on #{date.to_s} #{result.html_link}")
+        STDERR.puts("[#{timestamp}] #{data.summary}")
       rescue Exception 
-        @logger.info("Failed to create gig at date!")
-        @logger.info("ERROR: #{$!.to_s}")
-        @logger.info($!.backtrace)
+        STDERR.puts("[#{timestamp}] Failed to create gig at date!")
+        STDERR.puts("[#{timestamp}] ERROR: #{$!.to_s}")
+        STDERR.puts($!.backtrace)
       end
     end
   end
