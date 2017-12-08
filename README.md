@@ -22,3 +22,6 @@ Then edit the cron tab.
 
 
 Then reboot.
+
+
+Some of the formatting/encoding of the message body of these emails is inconsistent so we need to build a better scanner.

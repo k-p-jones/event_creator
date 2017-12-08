@@ -10,6 +10,7 @@ class EventData
     @curfew = fetch_curfew
     @location = fetch_location
     @uid = fetch_uid
+    @prefix = fetch_prefix
     @summary = fetch_summary
   end
     
@@ -63,8 +64,13 @@ class EventData
     (time.hour * 60 * 60) + (time.min * 60) + (time.sec)
   end
 
+  def fetch_prefix
+    return 'HTD' if @subject.downcase.start_with?('hold the date:')
+    return 'GC' if @subject.downcase.start_with?('gig confirmation:')
+  end
+
   def fetch_summary
-    str = "HTD for Band: #{@band}"
+    str = "#{@prefix} for Band: #{@band}"
     if @subject.downcase.include?('dj')
       str += " + DJ"
     end

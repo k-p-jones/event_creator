@@ -102,7 +102,7 @@ class TaskRunner
         result = @calendar.insert_event(Config::CALENDAR_ID, resource)
         STDERR.puts("[#{timestamp}] Event created for #{band} on #{date.to_s} #{result.html_link}")
         STDERR.puts("[#{timestamp}] #{data.summary}")
-      rescue Exception 
+      rescue Exception
         STDERR.puts("[#{timestamp}] Failed to create gig at date!")
         STDERR.puts("[#{timestamp}] ERROR: #{$!.to_s}")
         STDERR.puts($!.backtrace)
