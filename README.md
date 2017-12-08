@@ -13,8 +13,12 @@ We also will need a calendar_id.
 
 Then we will have to run the calendar authorization on its own in order to generate the tokens etc 
 
+We need to set the system time to GMT Europe/London
+
 Then run a scan of the last 12 months
 
 Then edit the cron tab.
+
+
 
 Then reboot.
