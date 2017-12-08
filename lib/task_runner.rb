@@ -2,31 +2,51 @@ require 'gmail'
 require 'date'
 require 'json'
 require 'fileutils'
-require 'pry'
 require_relative 'config.rb'
 require_relative 'event_data.rb'
 require_relative 'calendar_service.rb'
 require_relative 'patches/object.rb'
 
 class TaskRunner
+  SUBJECTS = ['hold the date:', 'gig confirmation:', 'not proceeding:'].freeze
+  PREFIXES = ['HTD', 'GC'].freeze
   def initialize(time_interval)
     @time_interval = time_interval
     @calendar = CalendarService.new.calendar
     @gmail = Gmail.connect!(Config::UNAME, Config::PWORD)
+    @emails = []
   end
 
   def run
     STDERR.puts("[#{timestamp}] Preparing to scan emails")
-    @gmail.inbox.emails(:after => DateTime.now - @time_interval) do |mail|
-      subject = mail.message.subject
-      next unless subject.downcase.start_with?("hold the date:")
-      process_gig(mail)
-    end
-    @gmail.logout
+    collect_mail
+    scan_emails(@emails) if @emails
     STDERR.puts("[#{timestamp}] Finished scan")
   end
 
   private
+
+  def collect_mail
+    @gmail.inbox.emails(:after => DateTime.now - @time_interval) do |mail|
+      subject = mail.message.subject
+      next unless valid_subject?(subject.downcase)
+      @emails << mail
+    end
+    @gmail.logout
+  end
+
+  def valid_subject?(mail_subject)
+    SUBJECTS.each do |subject|
+      return true if mail_subject.start_with?(subject)
+    end
+    false
+  end
+
+  def scan_emails(emails)
+    @emails.each do |mail|
+      process_gig(mail)
+    end
+  end
 
   def timestamp
     DateTime.now.to_s
