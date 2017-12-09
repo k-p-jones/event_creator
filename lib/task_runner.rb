@@ -8,19 +8,20 @@ require_relative 'calendar_service.rb'
 require_relative 'patches/object.rb'
 
 class TaskRunner
-  SUBJECTS = ['hold the date:', 'gig confirmation:', 'not proceeding:'].freeze
+  SUBJECTS = ['hold the date:', 'gig confirmation:'].freeze
 
   def initialize(time_interval)
     @time_interval = time_interval
     @calendar = CalendarService.new.calendar
     @gmail = Gmail.connect!(Config::UNAME, Config::PWORD)
     @emails = []
+    @cancellations = []
   end
 
   def run
     STDERR.puts("[#{timestamp}] Preparing to scan emails")
     collect_mail
-    process_emails if @emails
+    process_emails unless @emails.empty? && @cancellations.empty?
     STDERR.puts("[#{timestamp}] Finished scan")
   end
 
@@ -28,8 +29,12 @@ class TaskRunner
 
   def collect_mail
     @gmail.inbox.emails(:after => DateTime.now - @time_interval) do |mail|
-      subject = mail.message.subject
-      next unless valid_subject?(subject.downcase)
+      subject = mail.message.subject.downcase
+      if subject.start_with?('not proceeding:')
+        @cancellations << mail
+        next
+      end
+      next unless valid_subject?(subject)
       @emails << mail
     end
     @gmail.logout
@@ -43,14 +48,38 @@ class TaskRunner
   end
 
   def process_emails
+    process_gigs
+    process_cancellations
+  end
+
+  def process_gigs
+    STDERR.puts("[#{timestamp}] Processing Events")
     @emails.each do |mail|
       gig_data = create_gig(mail)
       process_event(gig_data)
     end
   end
 
+  def process_cancellations
+    STDERR.puts("[#{timestamp}] Processing Cancellations")
+    @cancellations.each do |mail|
+      data = create_gig(mail)
+      event = fetch_events_by_day(data).first
+      if event
+        cancel_event(event)
+        STDERR.puts("[#{timestamp}] Deleting event for #{data.band} on #{data.date}")
+      else
+        STDERR.puts("[#{timestamp}] Attempted to cancel event for #{data.band} on #{data.date} but no event was found")
+      end
+    end
+  end
+
   def timestamp
     DateTime.now.to_s
+  end
+
+  def cancel_event(event)
+    @calendar.delete_event(Config::CALENDAR_ID, event.id)
   end
 
   def create_gig(mail)
