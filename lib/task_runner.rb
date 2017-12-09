@@ -9,7 +9,7 @@ require_relative 'patches/object.rb'
 
 class TaskRunner
   SUBJECTS = ['hold the date:', 'gig confirmation:', 'not proceeding:'].freeze
-  PREFIXES = ['HTD', 'GC'].freeze
+
   def initialize(time_interval)
     @time_interval = time_interval
     @calendar = CalendarService.new.calendar
@@ -20,7 +20,7 @@ class TaskRunner
   def run
     STDERR.puts("[#{timestamp}] Preparing to scan emails")
     collect_mail
-    scan_emails(@emails) if @emails
+    process_emails if @emails
     STDERR.puts("[#{timestamp}] Finished scan")
   end
 
@@ -42,9 +42,10 @@ class TaskRunner
     false
   end
 
-  def scan_emails(emails)
+  def process_emails
     @emails.each do |mail|
-      process_gig(mail)
+      gig_data = create_gig(mail)
+      process_event(gig_data)
     end
   end
 
@@ -52,61 +53,54 @@ class TaskRunner
     DateTime.now.to_s
   end
 
-  def process_gig(mail)
+  def create_gig(mail)
     array = mail.message.subject.sub(',', '').split(':')
     band = array[1]
     date = Date.parse(array[2].split[0...4].join(' '))
-    make_event(date, band, mail)
+    EventData.new(date, mail, band)
   end
 
-  def event_exists?(data, band)
-    exists = false
-    events = fetch_events_by_day(data.date)
-    events.each do |event|
-      uid = event.summary.match(/UID:(\d+)/)
-      next unless uid
-      exists =  true if event.summary.include?(band) && uid[1].to_i == data.uid
-    end
-    if exists
-      STDERR.puts("[#{timestamp}] Not creating event #{data.uid} as it already exists")
-    end
-    exists
-  end
-
-  def fetch_events_by_day(date)
-    @calendar.list_events(Config::CALENDAR_ID,
+  def fetch_events_by_day(data)
+    date = data.date
+    events = @calendar.list_events(Config::CALENDAR_ID,
       max_results: 10,
       single_events: true,
       order_by: 'startTime',
       time_min: date.to_time.iso8601,
       time_max: (date + 1).to_time.iso8601
      ).items
+    events.select { |event| event.summary.include?(data.band) && event.summary.include?(data.uid.to_s) }
   end
 
-  def make_event(date, band, mail)
-    data = EventData.new(date, mail, band)
-    unless event_exists?(data, band)
-      begin
-        resource = Google::Apis::CalendarV3::Event.new({
-            summary: data.summary,
-            location: data.location.force_encoding('UTF-8'),
-            start: {
-              date_time: data.load_in,
-              time_zone: 'Europe/London',
-            },
-            end: {
-              date_time: data.curfew,
-              time_zone: 'Europe/London',
-            }
-        })
-        result = @calendar.insert_event(Config::CALENDAR_ID, resource)
-        STDERR.puts("[#{timestamp}] Event created for #{band} on #{date.to_s} #{result.html_link}")
-        STDERR.puts("[#{timestamp}] #{data.summary}")
-      rescue Exception
-        STDERR.puts("[#{timestamp}] Failed to create gig at date!")
-        STDERR.puts("[#{timestamp}] ERROR: #{$!.to_s}")
-        STDERR.puts($!.backtrace)
-      end
+  def process_event(data)
+    events_on_date = fetch_events_by_day(data)
+    if events_on_date.empty?
+      insert_event(data)
+    else
+      update_event(events_on_date, data)
     end
+  end
+
+  def update_event(events, data)
+    resource = Google::Apis::CalendarV3::Event.new(data.to_hash)
+    events.each do |event|
+      result = @calendar.update_event(Config::CALENDAR_ID, event.id, resource)
+      STDERR.puts("[#{timestamp}] Updating event for #{data.band} on #{data.date.to_s} #{result.html_link}")
+    end
+  rescue Exception
+    STDERR.puts("[#{timestamp}] Failed to create gig!")
+    STDERR.puts("[#{timestamp}] ERROR: #{$!.to_s}")
+    STDERR.puts($!.backtrace)
+  end
+
+  def insert_event(data)
+    resource = Google::Apis::CalendarV3::Event.new(data.to_hash)
+    result = @calendar.insert_event(Config::CALENDAR_ID, resource)
+    STDERR.puts("[#{timestamp}] Event created for #{data.band} on #{data.date.to_s} #{result.html_link}")
+    STDERR.puts("[#{timestamp}] #{data.summary}")
+  rescue Exception
+    STDERR.puts("[#{timestamp}] Failed to create gig!")
+    STDERR.puts("[#{timestamp}] ERROR: #{$!.to_s}")
+    STDERR.puts($!.backtrace)
   end
 end

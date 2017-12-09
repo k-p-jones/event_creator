@@ -1,6 +1,7 @@
 class EventData
   attr_reader :load_in, :curfew, :location, 
-              :date, :uid, :band, :summary
+              :date, :uid, :band, :summary,
+              :prefix
   def initialize(date, mail, band)
     @date = date
     @band = band
@@ -12,6 +13,21 @@ class EventData
     @uid = fetch_uid
     @prefix = fetch_prefix
     @summary = fetch_summary
+  end
+
+  def to_hash
+    {
+      summary: @summary,
+      location: @location.force_encoding('UTF-8'),
+      start: {
+        date_time: @load_in,
+        time_zone: 'Europe/London',
+      },
+      end: {
+        date_time: @curfew,
+        time_zone: 'Europe/London',
+      }
+    }
   end
     
   private
