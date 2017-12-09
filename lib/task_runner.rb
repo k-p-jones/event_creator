@@ -14,14 +14,11 @@ class TaskRunner
     @time_interval = time_interval
     @calendar = CalendarService.new.calendar
     @gmail = Gmail.connect!(Config::UNAME, Config::PWORD)
-    @emails = []
-    @cancellations = []
   end
 
   def run
     STDERR.puts("[#{timestamp}] Preparing to scan emails")
     collect_mail
-    process_emails unless @emails.empty? && @cancellations.empty?
     STDERR.puts("[#{timestamp}] Finished scan")
   end
 
@@ -31,11 +28,11 @@ class TaskRunner
     @gmail.inbox.emails(:after => DateTime.now - @time_interval) do |mail|
       subject = mail.message.subject.downcase
       if subject.start_with?('not proceeding:')
-        @cancellations << mail
+        cancel_event(mail)
         next
       end
       next unless valid_subject?(subject)
-      @emails << mail
+      process_event(mail)
     end
     @gmail.logout
   end
@@ -47,39 +44,19 @@ class TaskRunner
     false
   end
 
-  def process_emails
-    process_gigs
-    process_cancellations
-  end
-
-  def process_gigs
-    STDERR.puts("[#{timestamp}] Processing Events")
-    @emails.each do |mail|
-      gig_data = create_gig(mail)
-      process_event(gig_data)
-    end
-  end
-
-  def process_cancellations
-    STDERR.puts("[#{timestamp}] Processing Cancellations")
-    @cancellations.each do |mail|
-      data = create_gig(mail)
-      event = fetch_events_by_day(data).first
-      if event
-        cancel_event(event)
-        STDERR.puts("[#{timestamp}] Deleting event for #{data.band} on #{data.date}")
-      else
-        STDERR.puts("[#{timestamp}] Attempted to cancel event for #{data.band} on #{data.date} but no event was found")
-      end
-    end
-  end
-
   def timestamp
     DateTime.now.to_s
   end
 
-  def cancel_event(event)
-    @calendar.delete_event(Config::CALENDAR_ID, event.id)
+  def cancel_event(mail)
+    data = create_gig(mail)
+    event = fetch_events_by_day(data).first
+    if event
+      @calendar.delete_event(Config::CALENDAR_ID, event.id)
+      STDERR.puts("[#{timestamp}] Deleting event for #{data.band} on #{data.date}")
+    else
+      STDERR.puts("[#{timestamp}] Attempted to cancel event for #{data.band} on #{data.date} but no event was found")
+    end
   end
 
   def create_gig(mail)
@@ -101,7 +78,8 @@ class TaskRunner
     events.select { |event| event.summary.include?(data.band) && event.summary.include?(data.uid.to_s) }
   end
 
-  def process_event(data)
+  def process_event(mail)
+    data = create_gig(mail)
     events_on_date = fetch_events_by_day(data)
     if events_on_date.empty?
       insert_event(data)
