@@ -47,7 +47,6 @@ class EventData
   def fetch_curfew
     match = @message.match(/Curfew:\r\n(\d{2}:\d{2})/)
     if match
-      # there was an instance where this caused a bug
       if match[1] < @load_in
         result = create_datetime((@date + 1), match[1])
       else

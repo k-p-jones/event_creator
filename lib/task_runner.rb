@@ -1,7 +1,5 @@
 require 'gmail'
 require 'date'
-require 'json'
-require 'fileutils'
 require_relative 'config.rb'
 require_relative 'event_data.rb'
 require_relative 'calendar_service.rb'
@@ -94,7 +92,7 @@ class TaskRunner
       result = @calendar.update_event(Config::CALENDAR_ID, event.id, resource)
       STDERR.puts("[#{timestamp}] Updating event for #{data.band} on #{data.date.to_s} #{result.html_link}")
     end
-  rescue Exception
+  rescue StandardError
     STDERR.puts("[#{timestamp}] Failed to create gig!")
     STDERR.puts("[#{timestamp}] ERROR: #{$!.to_s}")
     STDERR.puts($!.backtrace)
@@ -105,7 +103,7 @@ class TaskRunner
     result = @calendar.insert_event(Config::CALENDAR_ID, resource)
     STDERR.puts("[#{timestamp}] Event created for #{data.band} on #{data.date.to_s} #{result.html_link}")
     STDERR.puts("[#{timestamp}] #{data.summary}")
-  rescue Exception
+  rescue StandardError
     STDERR.puts("[#{timestamp}] Failed to create gig!")
     STDERR.puts("[#{timestamp}] ERROR: #{$!.to_s}")
     STDERR.puts($!.backtrace)

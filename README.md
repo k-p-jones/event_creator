@@ -1,28 +1,15 @@
-### SETUP
-# This needs to be scripted
+### Event Creator
 
-First you will need to go to google and register your app and get the client secret json file and dump it in the top level directory of the app.
+This project was born out of my reluctance to constantly be checking my emails and updating my google calendar to organise my weekend work.
 
-bundle install
+Every week I receive many automated emails from my function
+band agency telling me to 'hold the date' in my diary for a gig.
+I also get emails confirming gigs and canceling gigs.
 
-Then you will need to create a log dir and file `mkdir -p logs/nelly.log`
+This little program reads my emails for me, extracts the required data and creates/updates/deletes events from my google calendar accordingly so I dont have to.
 
-Then we need to set the ENV variables with a gmail username and password and credentials path
+It's based on the bold assumption that the software my agency use to spam me with emails won't change its format for a while but I can live with that risk.
 
-We also will need a calendar_id.
+It is designed to run as a cron job on my pi and check my emails every hour and update my calendar for me.
 
-Then we will have to run the calendar authorization on its own in order to generate the tokens etc 
-
-We need to set the system time to GMT Europe/London
-
-Then run a scan of the last 12 months
-
-Then edit the cron tab.
-
-
-
-Then reboot.
-
-
-Some of the formatting/encoding of the message body of these emails is inconsistent so we need to build a better scanner.
-
+cron command -> `cd /home/pi/event_creator ; ruby event_creator.rb 1 hours >> logs/event_creator.log 2>&1`

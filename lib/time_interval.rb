@@ -1,3 +1,6 @@
+# NOTE: no support for singulars so
+# 1 hour will have to be -> 1 hours
+
 class TimeInterval
   MOD_TABLE = { 
     days: 1,
